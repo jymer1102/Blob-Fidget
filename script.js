@@ -17,6 +17,11 @@ const totalPoints = 36;
 const radius = 85; 
 const targetArea = Math.PI * radius * radius; 
 
+// --- STABILITY LIMITS ---
+const MAX_VELOCITY = 15;        // Caps maximum speed per frame to stop infinite acceleration
+const MAX_STRETCH_FACTOR = 1.6; // Prevents lines from expanding past 160% of original rest length
+const MIN_STRETCH_FACTOR = 0.4; // Prevents lines from crushing into nothingness
+
 let points = [];
 let isDragging = false;
 
@@ -60,6 +65,13 @@ function updatePhysics() {
         let vx = (p.x - p.oldX) * friction;
         let vy = (p.y - p.oldY) * friction;
 
+        // Apply Terminal Velocity Cap
+        const speed = Math.hypot(vx, vy);
+        if (speed > MAX_VELOCITY) {
+            vx = (vx / speed) * MAX_VELOCITY;
+            vy = (vy / speed) * MAX_VELOCITY;
+        }
+
         if (isDragging) {
             const angleToCenter = Math.atan2(p.y - cy, p.x - cx);
             const tangentX = -Math.sin(angleToCenter);
@@ -93,11 +105,25 @@ function updatePhysics() {
             p.y += (targetDistY - p.y) * 0.04;
         }
 
+        // Screen Boundaries with explicit velocity dampening
         const margin = 10;
-        if (p.y > canvas.height - margin) { p.y = canvas.height - margin; p.oldY = p.y + vy * bounce; }
-        if (p.y < margin) { p.y = margin; p.oldY = p.y + vy * bounce; }
-        if (p.x > canvas.width - margin) { p.x = canvas.width - margin; p.oldX = p.x + vx * bounce; }
-        if (p.x < margin) { p.x = margin; p.oldX = p.x + vx * bounce; }
+        if (p.y > canvas.height - margin) { 
+            p.y = canvas.height - margin; 
+            p.oldY = p.y + Math.abs(vy) * bounce; 
+            p.oldX = p.x - (p.x - p.oldX) * 0.8; // Dampen horizontal sliding friction on walls
+        }
+        if (p.y < margin) { 
+            p.y = margin; 
+            p.oldY = p.y - Math.abs(vy) * bounce; 
+        }
+        if (p.x > canvas.width - margin) { 
+            p.x = canvas.width - margin; 
+            p.oldX = p.x + Math.abs(vx) * bounce; 
+        }
+        if (p.x < margin) { 
+            p.x = margin; 
+            p.oldX = p.x - Math.abs(vx) * bounce; 
+        }
     });
 
     const restLength = (radius * 2 * Math.PI) / totalPoints;
@@ -107,12 +133,32 @@ function updatePhysics() {
         for (let i = 0; i < totalPoints; i++) {
             const p1 = points[i];
             const p2 = points[(i + 1) % totalPoints];
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const dist = Math.hypot(dx, dy);
+            let dx = p2.x - p1.x;
+            let dy = p2.y - p1.y;
+            let dist = Math.hypot(dx, dy);
             
             if (dist === 0) continue;
             
+            // Limit the physical stretching distance of the skin meshes
+            const maxAllowedDist = restLength * MAX_STRETCH_FACTOR;
+            const minAllowedDist = restLength * MIN_STRETCH_FACTOR;
+            
+            if (dist > maxAllowedDist) {
+                const overfill = dist - maxAllowedDist;
+                p1.x += (dx / dist) * overfill * 0.5;
+                p1.y += (dy / dist) * overfill * 0.5;
+                p2.x -= (dx / dist) * overfill * 0.5;
+                p2.y -= (dy / dist) * overfill * 0.5;
+                dist = maxAllowedDist;
+            } else if (dist < minAllowedDist) {
+                const underfill = minAllowedDist - dist;
+                p1.x -= (dx / dist) * underfill * 0.5;
+                p1.y -= (dy / dist) * underfill * 0.5;
+                p2.x += (dx / dist) * underfill * 0.5;
+                p2.y += (dy / dist) * underfill * 0.5;
+                dist = minAllowedDist;
+            }
+
             const diff = restLength - dist;
             const elasticity = isDragging ? 0.45 : 0.22; 
             
@@ -129,7 +175,9 @@ function updatePhysics() {
         const areaDelta = targetArea - currentArea;
 
         if (currentArea !== 0) {
-            const pressureFactor = (areaDelta / currentArea) * (isDragging ? 0.05 : 0.08);
+            // Cap how hard the internal hydro-pressure engine can explode outwards
+            let pressureFactor = (areaDelta / currentArea) * (isDragging ? 0.05 : 0.08);
+            pressureFactor = Math.max(-0.05, Math.min(0.05, pressureFactor));
             
             points.forEach(p => {
                 const normalX = p.x - cx;
