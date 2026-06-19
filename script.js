@@ -11,16 +11,16 @@ resize();
 let baseColor = "#00ffaa";
 const gravity = 0.35; 
 const friction = 0.985; 
-const bounce = 0.25; 
+const bounce = 0.15; // Slightly reduced to prevent jitter on flat surfaces
 
 const totalPoints = 36; 
 const radius = 85; 
 const targetArea = Math.PI * radius * radius; 
 
 // --- STABILITY LIMITS ---
-const MAX_VELOCITY = 15;        // Caps maximum speed per frame to stop infinite acceleration
-const MAX_STRETCH_FACTOR = 1.6; // Prevents lines from expanding past 160% of original rest length
-const MIN_STRETCH_FACTOR = 0.4; // Prevents lines from crushing into nothingness
+const MAX_VELOCITY = 12;        
+const MAX_STRETCH_FACTOR = 1.5; 
+const MIN_STRETCH_FACTOR = 0.5; 
 
 let points = [];
 let isDragging = false;
@@ -65,7 +65,6 @@ function updatePhysics() {
         let vx = (p.x - p.oldX) * friction;
         let vy = (p.y - p.oldY) * friction;
 
-        // Apply Terminal Velocity Cap
         const speed = Math.hypot(vx, vy);
         if (speed > MAX_VELOCITY) {
             vx = (vx / speed) * MAX_VELOCITY;
@@ -105,29 +104,36 @@ function updatePhysics() {
             p.y += (targetDistY - p.y) * 0.04;
         }
 
-        // Screen Boundaries with explicit velocity dampening
-        const margin = 10;
+        // --- EVEN SURFACE BOUNDARY CLAMPING ---
+        const margin = 12;
+        
+        // Bottom Boundary
         if (p.y > canvas.height - margin) { 
             p.y = canvas.height - margin; 
             p.oldY = p.y + Math.abs(vy) * bounce; 
-            p.oldX = p.x - (p.x - p.oldX) * 0.8; // Dampen horizontal sliding friction on walls
+            p.oldX = p.x - (p.x - p.oldX) * 0.7; // Zero out erratic sliding energy
         }
+        // Top Boundary
         if (p.y < margin) { 
             p.y = margin; 
             p.oldY = p.y - Math.abs(vy) * bounce; 
         }
+        // Right Boundary (Enforces a flat vertical rest profile)
         if (p.x > canvas.width - margin) { 
             p.x = canvas.width - margin; 
             p.oldX = p.x + Math.abs(vx) * bounce; 
+            p.oldY = p.y - (p.y - p.oldY) * 0.7; // Level out vertical sheer along the wall
         }
+        // Left Boundary
         if (p.x < margin) { 
             p.x = margin; 
             p.oldX = p.x - Math.abs(vx) * bounce; 
+            p.oldY = p.y - (p.y - p.oldY) * 0.7;
         }
     });
 
     const restLength = (radius * 2 * Math.PI) / totalPoints;
-    const iterations = 6;
+    const iterations = 8; // Increased execution pass iterations for tighter surface settling
 
     for (let step = 0; step < iterations; step++) {
         for (let i = 0; i < totalPoints; i++) {
@@ -139,7 +145,6 @@ function updatePhysics() {
             
             if (dist === 0) continue;
             
-            // Limit the physical stretching distance of the skin meshes
             const maxAllowedDist = restLength * MAX_STRETCH_FACTOR;
             const minAllowedDist = restLength * MIN_STRETCH_FACTOR;
             
@@ -160,7 +165,7 @@ function updatePhysics() {
             }
 
             const diff = restLength - dist;
-            const elasticity = isDragging ? 0.45 : 0.22; 
+            const elasticity = isDragging ? 0.45 : 0.25; 
             
             const adjustmentX = (dx / dist) * diff * elasticity;
             const adjustmentY = (dy / dist) * diff * elasticity;
@@ -175,9 +180,8 @@ function updatePhysics() {
         const areaDelta = targetArea - currentArea;
 
         if (currentArea !== 0) {
-            // Cap how hard the internal hydro-pressure engine can explode outwards
-            let pressureFactor = (areaDelta / currentArea) * (isDragging ? 0.05 : 0.08);
-            pressureFactor = Math.max(-0.05, Math.min(0.05, pressureFactor));
+            let pressureFactor = (areaDelta / currentArea) * (isDragging ? 0.04 : 0.07);
+            pressureFactor = Math.max(-0.04, Math.min(0.04, pressureFactor));
             
             points.forEach(p => {
                 const normalX = p.x - cx;
