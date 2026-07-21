@@ -4,7 +4,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './', // relative paths so it works on GitHub Pages at any subpath
+  base: '/Blob_Fidget/',
   logLevel: 'error',
   plugins: [react()],
   resolve: {
