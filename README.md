@@ -1,5 +1,6 @@
 <div align="center">
-# Blob_Fidget
+
+  # Blob_Fidget
 
 ![README Banner](favicon.PNG)
 
