@@ -4,7 +4,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/Blob_Fidget/',
+  base: '/Blob-Fidget/',
   logLevel: 'error',
   plugins: [react()],
   resolve: {
