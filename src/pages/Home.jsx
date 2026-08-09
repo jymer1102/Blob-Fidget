@@ -40,7 +40,7 @@ export default function Home() {
             boxShadow: "0 8px 32px rgba(0,0,0,0.37)",
           }}
         >
-          🌀 Enable Tilt & Shake
+          <i className="fa-solid fa-spiral"></i> Enable Tilt & Shake
         </button>
       )}
     </div>
