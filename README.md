@@ -2,6 +2,6 @@
 
   # Blob Fidget
 
-![README Banner](favicon.PNG)
+![README Banner](favicon.png)
 
 An incredibly satisfying visual blob. Drag, stretch, and interact with a physics-based colorful blob.
