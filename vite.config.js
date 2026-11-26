@@ -2,10 +2,9 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import path from 'path'
 
-// https://vite.dev/config/
+// Served from the root of https://blob-fidget.jymer1102.com, so base is '/'.
 export default defineConfig({
-  base: '/Blob-Fidget/',
-  logLevel: 'error',
+  base: '/',
   plugins: [react()],
   resolve: {
     alias: {
