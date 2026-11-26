@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 
 const TOTAL_POINTS = 36;
 const RADIUS = 85;
@@ -10,6 +10,7 @@ const MAX_VELOCITY = 12;
 const MAX_STRETCH_FACTOR = 1.5;
 const MIN_STRETCH_FACTOR = 0.5;
 const VELOCITY_DEADZONE = 0.015;
+const SPIN_DAMPING = 0.9; // fraction of net ring rotation removed per frame when not dragging
 
 function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -56,8 +57,17 @@ function getBlobMetrics(pts) {
 
 // ─── Audio engine (lazy init on first interaction) ───────────────────────────
 let audioCtx = null;
+let audioUnlocked = false;
+
+// Browsers (especially iOS Safari) only allow audio after a user gesture, so the
+// context is created lazily the first time the user actually interacts.
+function unlockAudio() {
+  audioUnlocked = true;
+  getAudioCtx();
+}
 
 function getAudioCtx() {
+  if (!audioUnlocked) return null;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
@@ -155,7 +165,7 @@ function playStretch(amount = 1) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGravityRef, shakeRef: externalShakeRef }) {
+export default function BlobCanvas({ color = "#00ffaa" }) {
   const canvasRef = useRef(null);
   const pointsRef = useRef([]);
   const mouseRef = useRef({ x: 0, y: 0, dragging: false });
@@ -177,12 +187,6 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
   // Gyroscope gravity & shake
   const gravityRef = useRef({ gx: 0, gy: BASE_GRAVITY });
   const shakeRef = useRef(false);
-
-  // Expose refs to parent if needed
-  useEffect(() => {
-    if (externalGravityRef) externalGravityRef.current = gravityRef.current;
-    if (externalShakeRef) externalShakeRef.current = shakeRef;
-  }, [externalGravityRef, externalShakeRef]);
 
   // Sound throttle refs
   const lastSquishTime = useRef(0);
@@ -216,10 +220,20 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
+    // Logical (CSS pixel) size; the backing store is scaled by devicePixelRatio
+    // so the blob stays sharp on retina / phone screens.
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    let dpr = 1;
+
     function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      if (pointsRef.current.length === 0) initPoints(canvas.width, canvas.height);
+      W = window.innerWidth;
+      H = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (pointsRef.current.length === 0) initPoints(W, H);
     }
     resize();
     window.addEventListener("resize", resize);
@@ -247,6 +261,27 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
       let cx = 0, cy = 0;
       for (const p of pts) { cx += p.x; cy += p.y; }
       cx /= n; cy /= n;
+
+      // Remove net spin of the point ring about its centroid. Nothing in the solver
+      // resists it, so a resting blob would otherwise spin up like a wheel and roll
+      // itself across the floor. Translation and squish/wobble are left untouched.
+      // (While dragging, the tangential damping below already handles this.)
+      if (!mouse.dragging) {
+        let L = 0, I = 0;
+        for (const p of pts) {
+          const rx = p.x - cx, ry = p.y - cy;
+          L += rx * (p.y - p.oldY) - ry * (p.x - p.oldX);
+          I += rx * rx + ry * ry;
+        }
+        if (I > 0) {
+          const w = (L / I) * SPIN_DAMPING;
+          for (const p of pts) {
+            const rx = p.x - cx, ry = p.y - cy;
+            p.oldX -= w * ry;
+            p.oldY += w * rx;
+          }
+        }
+      }
 
       const wc = wallContactRef.current;
       let hitWall = false, hitSpeed = 0;
@@ -284,9 +319,9 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
         }
 
         // Boundary + wall sound detection
-        if (p.y > canvas.height - margin) {
+        if (p.y > H - margin) {
           if (!wc.bottom) { hitWall = true; hitSpeed = Math.max(hitSpeed, Math.abs(vy)); wc.bottom = true; }
-          p.y = canvas.height - margin;
+          p.y = H - margin;
           p.oldY = p.y + Math.abs(vy) * BOUNCE;
           p.oldX = p.x - (p.x - p.oldX) * 0.6;
         } else { wc.bottom = false; }
@@ -297,9 +332,9 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
           p.oldY = p.y - Math.abs(vy) * BOUNCE;
         } else { wc.top = false; }
 
-        if (p.x > canvas.width - margin) {
+        if (p.x > W - margin) {
           if (!wc.right) { hitWall = true; hitSpeed = Math.max(hitSpeed, Math.abs(vx)); wc.right = true; }
-          p.x = canvas.width - margin;
+          p.x = W - margin;
           p.oldX = p.x + Math.abs(vx) * BOUNCE;
           p.oldY = p.y - (p.y - p.oldY) * 0.6;
         } else { wc.right = false; }
@@ -320,7 +355,10 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
 
       const restLength = (RADIUS * 2 * Math.PI) / n;
       for (let step = 0; step < 8; step++) {
-        for (let i = 0; i < n; i++) {
+        for (let k = 0; k < n; k++) {
+          // Alternate the sweep direction each pass. Always solving 0 -> n-1 biases
+          // every pass the same way, which made a resting blob slowly creep sideways.
+          const i = step % 2 === 0 ? k : n - 1 - k;
           const p1 = pts[i], p2 = pts[(i + 1) % n];
           let dx = p2.x - p1.x, dy = p2.y - p1.y;
           let dist = Math.hypot(dx, dy);
@@ -386,7 +424,7 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
 
     function drawBlob() {
       ctx.fillStyle = "#05050a";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, W, H);
 
       const pts = pointsRef.current;
       if (pts.length === 0) return;
@@ -466,7 +504,7 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
       glowGrad.addColorStop(0.5, `rgba(${rgb.r},${rgb.g},${rgb.b},0.12)`);
       glowGrad.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
       ctx.shadowColor = `rgba(${rgb.r},${rgb.g},${rgb.b},0.45)`;
-      ctx.shadowBlur = 55 + sSq * 20;
+      ctx.shadowBlur = (55 + sSq * 20) * dpr;
       ctx.fillStyle = glowGrad;
       ctx.fill();
       ctx.shadowBlur = 0;
@@ -497,14 +535,14 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
       shadowGrad.addColorStop(0.65, "rgba(0,0,18,0.18)");
       shadowGrad.addColorStop(1, "rgba(0,0,20,0.52)");
       ctx.fillStyle = shadowGrad;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, W, H);
 
       // 3b. Edge darkening
       const edgeGrad = ctx.createRadialGradient(cx, cy, sMD * (0.45 + sSq * 0.2), cx, cy, sMD * 1.12);
       edgeGrad.addColorStop(0, "rgba(0,0,0,0)");
       edgeGrad.addColorStop(1, `rgba(0,0,0,${0.3 + (1 - sSq) * 0.25})`);
       ctx.fillStyle = edgeGrad;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, W, H);
 
       // 3c. Primary specular highlight
       ctx.save();
@@ -529,7 +567,7 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
         microGrad.addColorStop(0, `rgba(${Math.min(255, rgb.r + 200)},${Math.min(255, rgb.g + 200)},${Math.min(255, rgb.b + 200)},${0.3 * (1 - sSq)})`);
         microGrad.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = microGrad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, W, H);
       }
 
       ctx.restore();
@@ -547,6 +585,10 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
         updatePhysics();
         accumulator -= FIXED_DT;
       }
+      // If the simulation ever blows up, reset the blob instead of losing it forever
+      if (!pointsRef.current.every((p) => isFinite(p.x) && isFinite(p.y))) {
+        initPoints(W, H);
+      }
       drawBlob();
       animRef.current = requestAnimationFrame(loop);
     }
@@ -555,6 +597,9 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
 
     // ── Gyroscope / motion handlers ──────────────────────────────────────────
     const handleOrientation = (e) => {
+      // Desktops with a touchscreen fire one event with null values; ignore it
+      // (otherwise "beta = 0" would be read as a steep tilt and gravity flips).
+      if (e.gamma == null && e.beta == null) return;
       // gamma = left/right tilt (-90 to 90), beta = front/back tilt (-180 to 180)
       const gamma = Math.max(-45, Math.min(45, e.gamma || 0)); // clamp to ±45°
       const beta  = Math.max(-45, Math.min(45, (e.beta  || 0) - 45)); // subtract 45 so flat = 0
@@ -584,6 +629,7 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
 
     // ── Input handlers ───────────────────────────────────────────────────────
     const handleMouseDown = (e) => {
+      unlockAudio();
       if (e.target.closest("[data-ui]")) return;
       mouseRef.current = { x: e.clientX, y: e.clientY, dragging: true };
     };
@@ -599,7 +645,10 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
       const t = e.touches[0];
       mouseRef.current.x = t.clientX; mouseRef.current.y = t.clientY;
     };
-    const handleTouchEnd = () => { mouseRef.current.dragging = false; };
+    const handleTouchEnd = () => {
+      mouseRef.current.dragging = false;
+      unlockAudio(); // iOS only counts touchend as a gesture that can start audio
+    };
 
     window.addEventListener("mousedown", handleMouseDown);
     window.addEventListener("mousemove", handleMouseMove);
@@ -607,6 +656,7 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
     window.addEventListener("touchstart", handleTouchStart, { passive: false });
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchcancel", handleTouchEnd);
 
     return () => {
       cancelAnimationFrame(animRef.current);
@@ -621,14 +671,14 @@ export default function BlobCanvas({ color = "#00ffaa", gravityRef: externalGrav
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchEnd);
     };
   }, [initPoints]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full"
-      style={{ touchAction: "none" }}
+      className="blob-canvas"
     />
   );
 }
