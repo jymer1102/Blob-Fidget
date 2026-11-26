@@ -1,4 +1,4 @@
-# Build the Vite app and deploy it to GitHub Pages
+# Build the Vite app and deploy it to GitHub Pages (blob-fidget.jymer1102.com)
 name: Deploy to GitHub Pages
 
 on:
@@ -34,7 +34,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
+          path: ./dist
 
   deploy:
     environment:
@@ -45,4 +45,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
