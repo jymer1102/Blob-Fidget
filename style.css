@@ -1,0 +1,221 @@
+/* ==========================================================================
+  Blob Fidget — stylesheet
+  Design tokens, buttons and cursors follow the jymer1102.com site styles.
+  ========================================================================== */
+
+/* --------------------------------------------------------------------------
+  1. Design tokens
+  -------------------------------------------------------------------------- */
+:root {
+  --bg: #0a0a0c;
+  --bg-raised: #111116;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(30, 86, 224, 0.85);
+
+  --accent: #1e56e0;
+  --accent-bright: #4faafe;
+  --accent-glow: rgba(30, 86, 224, 0.35);
+
+  --text-1: #f7f7f7;
+  --text-2: #a3a3ac;
+
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-md: 12px;
+  --ease: cubic-bezier(0.22, 0.8, 0.28, 1);
+
+  --nav-bg: rgba(10, 10, 12, 0.72);
+}
+
+/* --------------------------------------------------------------------------
+  2. Reset & base
+  -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  background: #05050a; /* matches the canvas clear colour */
+  color: var(--text-1);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.blob-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* --------------------------------------------------------------------------
+  3. Controls (frosted panel + glow-on-hover, like the site's nav and buttons)
+  -------------------------------------------------------------------------- */
+.color-picker,
+.tilt-btn {
+  position: fixed;
+  z-index: 50;
+  background: var(--nav-bg);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-1);
+  transition:
+    border-color 0.25s var(--ease),
+    color 0.25s var(--ease),
+    box-shadow 0.25s var(--ease);
+}
+
+.color-picker:hover,
+.tilt-btn:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+
+/* Tint picker (top-left) */
+.color-picker {
+  top: max(24px, env(safe-area-inset-top));
+  left: max(24px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.color-picker.rainbow {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.color-picker span {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: color 0.1s;
+}
+
+.color-picker input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.color-picker input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+.color-picker input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+/* Tilt & shake toggle (bottom-centre). Same look as the site's .playground-btn;
+   the accent border/colour shows while tilt is on, like .playground-btn.primary. */
+.tilt-btn {
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tilt-btn:hover,
+.tilt-btn.is-on {
+  color: var(--accent-bright);
+}
+
+.tilt-btn.is-on {
+  border-color: var(--border-hover);
+}
+
+.tilt-btn:focus-visible {
+  outline-offset: 4px;
+  border-radius: var(--radius-md);
+}
+
+/* --------------------------------------------------------------------------
+  4. Cursors (files live in /public/cursors)
+  -------------------------------------------------------------------------- */
+html,
+body {
+  cursor: url("/cursors/arrow.cur") 4 4, default;
+}
+
+button,
+[role="button"] {
+  cursor: url("/cursors/pointer.cur") 13 2, url("/cursors/arrow.cur") 4 4, pointer;
+}
+
+input[type="color"] {
+  cursor: url("/cursors/precision-select.cur") 16 16, crosshair;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: url("/cursors/unavailable.cur") 16 16, not-allowed;
+}
+
+/* Grabbing the blob */
+.blob-canvas.is-dragging {
+  cursor: url("/cursors/move.cur") 16 16, move;
+}
