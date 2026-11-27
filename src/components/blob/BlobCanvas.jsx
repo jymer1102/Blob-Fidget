@@ -165,7 +165,7 @@ function playStretch(amount = 1) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function BlobCanvas({ color = "#00ffaa" }) {
+export default function BlobCanvas({ color = "#00ffaa", tiltEnabled = true }) {
   const canvasRef = useRef(null);
   const pointsRef = useRef([]);
   const mouseRef = useRef({ x: 0, y: 0, dragging: false });
@@ -198,6 +198,17 @@ export default function BlobCanvas({ color = "#00ffaa" }) {
   const wallContactRef = useRef({ top: false, bottom: false, left: false, right: false });
 
   useEffect(() => { colorRef.current = color; }, [color]);
+
+  // Tilt & shake on/off. When switched off, gravity snaps back to straight down.
+  const tiltEnabledRef = useRef(tiltEnabled);
+  useEffect(() => {
+    tiltEnabledRef.current = tiltEnabled;
+    if (!tiltEnabled) {
+      gravityRef.current.gx = 0;
+      gravityRef.current.gy = BASE_GRAVITY;
+      shakeRef.current = false;
+    }
+  }, [tiltEnabled]);
 
   const initPoints = useCallback((w, h) => {
     const cx = w / 2;
@@ -597,6 +608,7 @@ export default function BlobCanvas({ color = "#00ffaa" }) {
 
     // ── Gyroscope / motion handlers ──────────────────────────────────────────
     const handleOrientation = (e) => {
+      if (!tiltEnabledRef.current) return;
       // Desktops with a touchscreen fire one event with null values; ignore it
       // (otherwise "beta = 0" would be read as a steep tilt and gravity flips).
       if (e.gamma == null && e.beta == null) return;
@@ -610,6 +622,7 @@ export default function BlobCanvas({ color = "#00ffaa" }) {
     let lastShakeTime = 0;
     const SHAKE_THRESHOLD = 18;
     const handleMotion = (e) => {
+      if (!tiltEnabledRef.current) return;
       const acc = e.accelerationIncludingGravity;
       if (!acc) return;
       const mag = Math.hypot(acc.x || 0, acc.y || 0, acc.z || 0);
@@ -620,21 +633,23 @@ export default function BlobCanvas({ color = "#00ffaa" }) {
       }
     };
 
-    // Only enable gyro on touch/mobile devices — desktops fire null orientation events
-    const isTouchDevice = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
-    if (isTouchDevice) {
-      window.addEventListener("deviceorientation", handleOrientation);
-      window.addEventListener("devicemotion", handleMotion);
-    }
+    // Listeners are always attached: devices without sensors never send a real
+    // reading (null events are ignored above), and tiltEnabledRef gates the rest.
+    window.addEventListener("deviceorientation", handleOrientation);
+    window.addEventListener("devicemotion", handleMotion);
 
     // ── Input handlers ───────────────────────────────────────────────────────
     const handleMouseDown = (e) => {
       unlockAudio();
       if (e.target.closest("[data-ui]")) return;
       mouseRef.current = { x: e.clientX, y: e.clientY, dragging: true };
+      canvas.classList.add("is-dragging");
     };
     const handleMouseMove = (e) => { mouseRef.current.x = e.clientX; mouseRef.current.y = e.clientY; };
-    const handleMouseUp = () => { mouseRef.current.dragging = false; };
+    const handleMouseUp = () => {
+      mouseRef.current.dragging = false;
+      canvas.classList.remove("is-dragging");
+    };
 
     const handleTouchStart = (e) => {
       if (e.target.closest("[data-ui]")) return;
@@ -661,10 +676,8 @@ export default function BlobCanvas({ color = "#00ffaa" }) {
     return () => {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener("resize", resize);
-      if (isTouchDevice) {
-        window.removeEventListener("deviceorientation", handleOrientation);
-        window.removeEventListener("devicemotion", handleMotion);
-      }
+      window.removeEventListener("deviceorientation", handleOrientation);
+      window.removeEventListener("devicemotion", handleMotion);
       window.removeEventListener("mousedown", handleMouseDown);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
