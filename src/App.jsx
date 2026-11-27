@@ -1,46 +1,25 @@
 import { useState } from "react";
 import BlobCanvas from "@/components/blob/BlobCanvas";
 import ColorPicker from "@/components/blob/ColorPicker";
-
-// iOS 13+ gates motion sensors behind a permission prompt that must be
-// triggered from a tap. Newer desktop browsers also expose requestPermission(),
-// so only offer the button on touch devices.
-const isTouchDevice =
-  typeof window !== "undefined" &&
-  ("ontouchstart" in window || navigator.maxTouchPoints > 0);
-
-const needsMotionPermission =
-  isTouchDevice &&
-  typeof DeviceOrientationEvent !== "undefined" &&
-  typeof DeviceOrientationEvent.requestPermission === "function";
+import useMotionSensors from "@/hooks/useMotionSensors";
 
 export default function App() {
   const [color, setColor] = useState("#00ffaa");
-  const [showTiltBtn, setShowTiltBtn] = useState(needsMotionPermission);
-
-  const enableTilt = async () => {
-    try {
-      // Request both inside the same tap so the gesture isn't lost between awaits
-      await Promise.all([
-        DeviceOrientationEvent.requestPermission(),
-        typeof DeviceMotionEvent !== "undefined" &&
-        typeof DeviceMotionEvent.requestPermission === "function"
-          ? DeviceMotionEvent.requestPermission()
-          : Promise.resolve("granted"),
-      ]);
-    } catch {
-      // ignore; the prompt can't be shown again until the page is reloaded
-    }
-    setShowTiltBtn(false);
-  };
+  const { showToggle, tiltOn, toggle } = useMotionSensors();
 
   return (
     <div className="app">
-      <BlobCanvas color={color} />
+      <BlobCanvas color={color} tiltEnabled={tiltOn} />
       <ColorPicker color={color} onChange={setColor} />
 
-      {showTiltBtn && (
-        <button data-ui="true" className="glass tilt-btn" onClick={enableTilt}>
+      {/* Only rendered on devices that actually have motion sensors */}
+      {showToggle && (
+        <button
+          type="button"
+          data-ui="true"
+          className={`tilt-btn${tiltOn ? " is-on" : ""}`}
+          onClick={toggle}
+        >
           <svg
             width="16"
             height="16"
@@ -55,7 +34,7 @@ export default function App() {
             <rect x="7" y="2" width="10" height="20" rx="2" />
             <path d="M11 18h2" />
           </svg>
-          Enable Tilt &amp; Shake
+          {tiltOn ? "Disable" : "Enable"} Tilt &amp; Shake
         </button>
       )}
     </div>
