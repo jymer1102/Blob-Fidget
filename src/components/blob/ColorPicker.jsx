@@ -58,7 +58,7 @@ export default function ColorPicker({ color, onChange }) {
   return (
     <div
       data-ui="true"
-      className={`glass color-picker${rainbow ? " rainbow" : ""}`}
+      className={`color-picker${rainbow ? " rainbow" : ""}`}
       style={rainbow ? { boxShadow: `0 8px 32px rgba(0,0,0,0.37), 0 0 18px ${color}88` } : undefined}
     >
       <input
