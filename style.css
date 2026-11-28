@@ -47,7 +47,7 @@ body,
 }
 
 body {
-  background: #05050a; /* matches the canvas clear colour */
+  background: var(--bg); /* matches the canvas clear colour */
   color: var(--text-1);
   font-family: var(--font-body);
   line-height: 1.5;
@@ -194,28 +194,30 @@ input:focus-visible {
 }
 
 /* --------------------------------------------------------------------------
-  4. Cursors (files live in /public/cursors)
+  4. Cursors
+  Normal arrow everywhere, pointer on buttons, precision-select only when the
+  mouse is over the blob or dragging it. The .cur files live in /cursors; each
+  variable below also carries an embedded copy of the same cursor as a backup,
+  used automatically if the file can't be loaded.
   -------------------------------------------------------------------------- */
 html,
 body {
-  cursor: url("/cursors/arrow.cur") 4 4, default;
+  cursor: var(--cursor-arrow), default;
 }
 
 button,
-[role="button"] {
-  cursor: url("/cursors/pointer.cur") 13 2, url("/cursors/arrow.cur") 4 4, pointer;
-}
-
+[role="button"],
 input[type="color"] {
-  cursor: url("/cursors/precision-select.cur") 16 16, crosshair;
+  cursor: var(--cursor-pointer), pointer;
 }
 
-button:disabled,
-[aria-disabled="true"] {
-  cursor: url("/cursors/unavailable.cur") 16 16, not-allowed;
-}
-
-/* Grabbing the blob */
+.blob-canvas.over-blob,
 .blob-canvas.is-dragging {
-  cursor: url("/cursors/move.cur") 16 16, move;
+  cursor: var(--cursor-precision), crosshair;
+}
+
+:root {
+  --cursor-arrow: url("/cursors/arrow.cur") 4 4, url("data:image/x-icon;base64,AAACAAEAICAAAAQABABjAQAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAASpJREFUeJxjGAWDFgSs/v/Af9W//4GrflvS1WKQpfhw6Kr/ogPqABS8+n85VS33W/EnFGY4ivjqvysJOSZg9d/FFDvAf8XfdGwOQHHMyr9thEPn/26Ko8Bv5X87ItV/IOSgwHX/xchKA2Q4/jjeaFr17xRNHYBizur/E3E5BK/GgJV/wpBSuRUljkA45t9LkjxGrVDAY+7bgXXAyr8L8av8/5+Rmg4gKQ1QMxSAxTYPuuV+q/9HEOuA3+Rnx7+NJKd+vIXSqv8elNQl3lv+C5JsOanRAFTzCMPylf+ekmUxUv59T4IDkC3/R5HFOAw+RO9sS7ThA+oAmlqObgmwNns1oA5AtwTI/0Nzy6EWPcfhANr7HpdldLUcVwlHVwdACyZ4/UB3y0cBrQAA+BVcDXXq9RcAAAAASUVORK5CYII=") 4 4;
+  --cursor-pointer: url("/cursors/pointer.cur") 13 2, url("data:image/x-icon;base64,AAACAAEAICAAAA0AAgAwAQAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAAPdJREFUeJxjGAWkAIf9/1n8V/37D8OBq/7b0NUByJbD8IBY7jD/PwfdHYFu4agDBpUDEPh/9QA7gIahgd8Bf5dic0xDw38muqUBXCGC5Mguoi0LWPU/AajpLbkO8Fv1X4XsKMKi6QWpDiA7jQAV/MOh8SW5DghY/T8XmU+1lA4MZm9kA5Hkf6LwV//PItsBlFRAZDmAWEcQ54D/87GZQZYDqFH0kqQXnyPIsZxqDqAEkGwetR1BslnA/FsMd8Sa/4UUWn6ULM9QKxQoMocajhg0DiBXP0WOoEo0DrgDiGtwEMSfKXJA6Kr/bJQ4gCLLqREKVHEALQAAEPpR8fdxYncAAAAASUVORK5CYII=") 13 2;
+  --cursor-precision: url("/cursors/precision-select.cur") 16 16, url("data:image/x-icon;base64,AAACAAEAICAAABAAEAAZAgAAFgAAAIlQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAAeBJREFUeNrtl7tuE1EQhr85Z30RsaFDwW9AAQUVhSWLkkssNwvyUyDxAuQJeAaqWHgbpADKA1CkCh2PAPQxki97ZijsjUHaOGbtOLLkkbbZs2fnP/8/M2cGtttMps+N+P7LsRUHERUGIGJx3zxAIhKK/sYVOrmZtI+sMRH9NnGctY+skb2/dgCtQzwi5jzNct09KNd46HxoImKtQ/zmJADSMbpqKK0EQIpIuHIMrNl2AG4cgOTleZxcDuz8J1H9HmkKsavSA9Bh6Eb4JFu7bG8So4jY4iwQsQQWVbYA0OnZ4AJzsEHSlcDifVekoZnMyut+qPJYR/ksaMDj0tTQpoXpJ+bdk3Z/UkKjyPl8EK6C+iGnyUv5lfmaSzAroa33VO7c0rPKbXc/jHIFmuNV0MmUTVcSZFE0GfgKjM/5Pqrx6OQp44ztf7bd3UMFFLmeaDNU6wMsPwhntDzr2351CQkE1/Ql9wYgTPSdoV+vkmA45PRLrgQFrNOzF36PY4DwOz342C19Ws9dsHwa1i5o9FKL++Y3koattyYnryV0PpjOMaPJKwnZ2q4U7wBsrCMyVm/JCjNggkRlXFTG8f+96ILreMmB5HlCo+Q4NiBVDj7H/MjSeMPT0ZaPZls8nK7J/gDXmdiuzJN1bAAAAABJRU5ErkJggg==") 16 16;
 }
